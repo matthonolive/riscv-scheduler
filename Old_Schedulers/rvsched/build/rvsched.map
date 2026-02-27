@@ -1,0 +1,436 @@
+
+Discarded input sections
+
+ .text          0x00000000        0x0 build/start.o
+ .data          0x00000000        0x0 build/start.o
+ .bss           0x00000000        0x0 build/start.o
+ .data          0x00000000        0x0 build/trap.o
+ .bss           0x00000000        0x0 build/trap.o
+ .text          0x00000000        0x0 build/platform/uart16550.o
+ .data          0x00000000        0x0 build/platform/uart16550.o
+ .bss           0x00000000        0x0 build/platform/uart16550.o
+ .text          0x00000000        0x0 build/platform/timer_clint.o
+ .data          0x00000000        0x0 build/platform/timer_clint.o
+ .bss           0x00000000        0x0 build/platform/timer_clint.o
+ .text.timer_now_cycles
+                0x00000000       0x18 build/platform/timer_clint.o
+ .text          0x00000000        0x0 build/kernel/mini_libc.o
+ .data          0x00000000        0x0 build/kernel/mini_libc.o
+ .bss           0x00000000        0x0 build/kernel/mini_libc.o
+ .text.memcpy   0x00000000       0x18 build/kernel/mini_libc.o
+ .text          0x00000000        0x0 build/kernel/sched.o
+ .data          0x00000000        0x0 build/kernel/sched.o
+ .bss           0x00000000        0x0 build/kernel/sched.o
+ .text.sched_ticks
+                0x00000000        0xa build/kernel/sched.o
+ .text.sched_current_tid
+                0x00000000        0xa build/kernel/sched.o
+ .text.task_yield
+                0x00000000        0x6 build/kernel/sched.o
+ .text.task_sleep_until
+                0x00000000       0x58 build/kernel/sched.o
+ .text.task_wait_events
+                0x00000000       0x88 build/kernel/sched.o
+ .text.task_set_events
+                0x00000000       0x66 build/kernel/sched.o
+ .text          0x00000000        0x0 build/kernel/event.o
+ .data          0x00000000        0x0 build/kernel/event.o
+ .bss           0x00000000        0x0 build/kernel/event.o
+ .text.event_init
+                0x00000000        0x2 build/kernel/event.o
+ .debug_info    0x00000000       0x7f build/kernel/event.o
+ .debug_abbrev  0x00000000       0x43 build/kernel/event.o
+ .debug_aranges
+                0x00000000       0x20 build/kernel/event.o
+ .debug_rnglists
+                0x00000000       0x13 build/kernel/event.o
+ .debug_line    0x00000000       0x52 build/kernel/event.o
+ .debug_str     0x00000000      0x14f build/kernel/event.o
+ .debug_line_str
+                0x00000000       0x62 build/kernel/event.o
+ .comment       0x00000000       0x23 build/kernel/event.o
+ .debug_frame   0x00000000       0x20 build/kernel/event.o
+ .riscv.attributes
+                0x00000000       0x3d build/kernel/event.o
+ .text          0x00000000        0x0 build/kernel/trap_handler.o
+ .data          0x00000000        0x0 build/kernel/trap_handler.o
+ .bss           0x00000000        0x0 build/kernel/trap_handler.o
+ .text          0x00000000        0x0 build/app/task_table.o
+ .data          0x00000000        0x0 build/app/task_table.o
+ .bss           0x00000000        0x0 build/app/task_table.o
+ .text          0x00000000        0x0 build/app/spawn.o
+ .data          0x00000000        0x0 build/app/spawn.o
+ .bss           0x00000000        0x0 build/app/spawn.o
+ .text          0x00000000        0x0 build/app/dispatcher.o
+ .data          0x00000000        0x0 build/app/dispatcher.o
+ .bss           0x00000000        0x0 build/app/dispatcher.o
+ .text          0x00000000        0x0 build/app/main.o
+ .data          0x00000000        0x0 build/app/main.o
+ .bss           0x00000000        0x0 build/app/main.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+RAM              0x80000000         0x08000000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD build/start.o
+LOAD build/trap.o
+LOAD build/platform/uart16550.o
+LOAD build/platform/timer_clint.o
+LOAD build/kernel/mini_libc.o
+LOAD build/kernel/sched.o
+LOAD build/kernel/event.o
+LOAD build/kernel/trap_handler.o
+LOAD build/app/task_table.o
+LOAD build/app/spawn.o
+LOAD build/app/dispatcher.o
+LOAD build/app/main.o
+LOAD /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32imac/ilp32/libgcc.a
+                0x80000000                        . = ORIGIN (RAM)
+
+.text           0x80000000      0xcb2
+ *(.text.init)
+ .text.init     0x80000000       0x2e build/start.o
+                0x80000000                _start
+ *(.text .text.*)
+ *fill*         0x8000002e        0x2 
+ .text          0x80000030       0xb4 build/trap.o
+                0x80000030                trap_entry
+                0x800000e0                arch_start_first
+ .text.uart_init
+                0x800000e4        0x2 build/platform/uart16550.o
+                0x800000e4                uart_init
+ .text.uart_putc
+                0x800000e6       0x1a build/platform/uart16550.o
+                0x800000e6                uart_putc
+ .text.uart_puts
+                0x80000100       0x44 build/platform/uart16550.o
+                0x80000100                uart_puts
+ .text.uart_puthex
+                0x80000144       0x50 build/platform/uart16550.o
+                0x80000144                uart_puthex
+ .text.uart_putdec
+                0x80000194       0x7e build/platform/uart16550.o
+                0x80000194                uart_putdec
+ .text.uart_getc_nonblock
+                0x80000212       0x22 build/platform/uart16550.o
+                0x80000212                uart_getc_nonblock
+ .text.timer_init
+                0x80000234       0x58 build/platform/timer_clint.o
+                0x80000234                timer_init
+ .text.timer_ack_and_set_next
+                0x8000028c       0x38 build/platform/timer_clint.o
+                0x8000028c                timer_ack_and_set_next
+ .text.timer_tick_cycles
+                0x800002c4        0xa build/platform/timer_clint.o
+                0x800002c4                timer_tick_cycles
+ .text.memset   0x800002ce       0x18 build/kernel/mini_libc.o
+                0x800002ce                memset
+ .text.ready_clear
+                0x800002e6       0x34 build/kernel/sched.o
+ .text.task_exit
+                0x8000031a       0x3a build/kernel/sched.o
+ .text.pick_next_tid
+                0x80000354      0x100 build/kernel/sched.o
+ .text.sched_init
+                0x80000454       0x7c build/kernel/sched.o
+                0x80000454                sched_init
+ .text.task_create
+                0x800004d0      0x144 build/kernel/sched.o
+                0x800004d0                task_create
+ .text.sched_on_trap
+                0x80000614      0x21a build/kernel/sched.o
+                0x80000614                sched_on_trap
+ .text.task_sleep_ticks
+                0x8000082e       0x62 build/kernel/sched.o
+                0x8000082e                task_sleep_ticks
+ .text.sched_start
+                0x80000890       0x62 build/kernel/sched.o
+                0x80000890                sched_start
+ .text.trap_handler
+                0x800008f2       0xba build/kernel/trap_handler.o
+                0x800008f2                trap_handler
+ .text.task_hog
+                0x800009ac       0x16 build/app/task_table.o
+ .text.task_b   0x800009c2       0x1c build/app/task_table.o
+ .text.task_A   0x800009de       0x1c build/app/task_table.o
+ .text.task_lookup
+                0x800009fa       0x36 build/app/task_table.o
+                0x800009fa                task_lookup
+ .text.task_list_print
+                0x80000a30       0x6e build/app/task_table.o
+                0x80000a30                task_list_print
+ .text.spawn_task_id
+                0x80000a9e       0xcc build/app/spawn.o
+                0x80000a9e                spawn_task_id
+ .text.dispatcher
+                0x80000b6a       0xda build/app/dispatcher.o
+ .text.dispatcher_start
+                0x80000c44       0x16 build/app/dispatcher.o
+                0x80000c44                dispatcher_start
+ .text.idle     0x80000c5a        0x6 build/app/main.o
+ .text.startup.main
+                0x80000c60       0x52 build/app/main.o
+                0x80000c60                main
+
+.rodata         0x80000cb4      0x200
+ *(.rodata .rodata.*)
+ .rodata.uart_puthex.str1.4
+                0x80000cb4      0x1da build/platform/uart16550.o
+                                 0x15 (size before relaxing)
+ .rodata.sched_init.str1.4
+                0x80000e8e       0x14 build/kernel/sched.o
+ .rodata.sched_start.str1.4
+                0x80000e8e       0x58 build/kernel/sched.o
+ .rodata.trap_handler.str1.4
+                0x80000e8e       0x54 build/kernel/trap_handler.o
+ .rodata.task_hog.str1.4
+                0x80000e8e        0x2 build/app/task_table.o
+ .rodata.task_b.str1.4
+                0x80000e8e        0x2 build/app/task_table.o
+ .rodata.task_A.str1.4
+                0x80000e8e        0x2 build/app/task_table.o
+ .rodata.task_list_print.str1.4
+                0x80000e8e       0x1e build/app/task_table.o
+ *fill*         0x80000e8e        0x2 
+ .rodata.g_tasks
+                0x80000e90       0x24 build/app/task_table.o
+ .rodata.spawn_task_id.str1.4
+                0x80000eb4       0x86 build/app/spawn.o
+ .rodata.dispatcher.str1.4
+                0x80000eb4       0x36 build/app/dispatcher.o
+ .rodata.main.str1.4
+                0x80000eb4       0x22 build/app/main.o
+
+.rela.dyn       0x80000eb4        0x0
+ .rela.text.init
+                0x80000eb4        0x0 build/start.o
+
+.data           0x80000eb4        0xc
+                0x80000eb4                        _sdata = .
+ *(.data .data.*)
+ .data.g_tick_cycles
+                0x80000eb4        0x4 build/kernel/sched.o
+ .data.g_policy
+                0x80000eb8        0x4 build/kernel/sched.o
+ .data.g_cur    0x80000ebc        0x4 build/kernel/sched.o
+                0x80000ec0                        _edata = .
+
+.bss            0x80000ec0     0x4a80
+                0x80000ec0                        _sbss = .
+ *(.bss .bss.*)
+ .bss.g_tick_cycles
+                0x80000ec0        0x4 build/platform/timer_clint.o
+ .bss.g_rr_last
+                0x80000ec4        0x8 build/kernel/sched.o
+ .bss.g_ready_prio
+                0x80000ecc       0x20 build/kernel/sched.o
+ .bss.g_ticks   0x80000eec        0x4 build/kernel/sched.o
+ .bss.g_tasks   0x80000ef0      0x240 build/kernel/sched.o
+ .bss.g_stack_used
+                0x80001130       0x10 build/app/spawn.o
+ .bss.g_stack_pool
+                0x80001140     0x4000 build/app/spawn.o
+ .bss.stack_disp
+                0x80005140      0x400 build/app/main.o
+ .bss.stack_idle
+                0x80005540      0x400 build/app/main.o
+ *(COMMON)
+                0x80005940                        _ebss = .
+                0x80005940                        . = ALIGN (0x10)
+                0x88000000                        _stack_top = (ORIGIN (RAM) + LENGTH (RAM))
+OUTPUT(build/rvsched.elf elf32-littleriscv)
+
+.riscv.attributes
+                0x00000000       0x41
+ .riscv.attributes
+                0x00000000       0x3f build/start.o
+ .riscv.attributes
+                0x0000003f       0x3f build/trap.o
+ .riscv.attributes
+                0x0000007e       0x3d build/platform/uart16550.o
+ .riscv.attributes
+                0x000000bb       0x41 build/platform/timer_clint.o
+ .riscv.attributes
+                0x000000fc       0x3d build/kernel/mini_libc.o
+ .riscv.attributes
+                0x00000139       0x41 build/kernel/sched.o
+ .riscv.attributes
+                0x0000017a       0x41 build/kernel/trap_handler.o
+ .riscv.attributes
+                0x000001bb       0x3d build/app/task_table.o
+ .riscv.attributes
+                0x000001f8       0x3d build/app/spawn.o
+ .riscv.attributes
+                0x00000235       0x3d build/app/dispatcher.o
+ .riscv.attributes
+                0x00000272       0x41 build/app/main.o
+
+.comment        0x00000000       0x22
+ .comment       0x00000000       0x22 build/platform/uart16550.o
+                                 0x23 (size before relaxing)
+ .comment       0x00000022       0x23 build/platform/timer_clint.o
+ .comment       0x00000022       0x23 build/kernel/mini_libc.o
+ .comment       0x00000022       0x23 build/kernel/sched.o
+ .comment       0x00000022       0x23 build/kernel/trap_handler.o
+ .comment       0x00000022       0x23 build/app/task_table.o
+ .comment       0x00000022       0x23 build/app/spawn.o
+ .comment       0x00000022       0x23 build/app/dispatcher.o
+ .comment       0x00000022       0x23 build/app/main.o
+
+.debug_line     0x00000000     0x2f25
+ .debug_line    0x00000000       0x7a build/start.o
+ .debug_line    0x0000007a      0x220 build/trap.o
+ .debug_line    0x0000029a      0x560 build/platform/uart16550.o
+ .debug_line    0x000007fa      0x417 build/platform/timer_clint.o
+ .debug_line    0x00000c11      0x166 build/kernel/mini_libc.o
+ .debug_line    0x00000d77     0x16bb build/kernel/sched.o
+ .debug_line    0x00002432      0x21a build/kernel/trap_handler.o
+ .debug_line    0x0000264c      0x303 build/app/task_table.o
+ .debug_line    0x0000294f      0x1e8 build/app/spawn.o
+ .debug_line    0x00002b37      0x2f4 build/app/dispatcher.o
+ .debug_line    0x00002e2b       0xfa build/app/main.o
+
+.debug_line_str
+                0x00000000      0x171
+ .debug_line_str
+                0x00000000      0x171 build/start.o
+                                 0x26 (size before relaxing)
+ .debug_line_str
+                0x00000171       0x25 build/trap.o
+ .debug_line_str
+                0x00000171       0xbe build/platform/uart16550.o
+ .debug_line_str
+                0x00000171       0xca build/platform/timer_clint.o
+ .debug_line_str
+                0x00000171       0xb0 build/kernel/mini_libc.o
+ .debug_line_str
+                0x00000171       0xd0 build/kernel/sched.o
+ .debug_line_str
+                0x00000171       0xd6 build/kernel/trap_handler.o
+ .debug_line_str
+                0x00000171       0xbb build/app/task_table.o
+ .debug_line_str
+                0x00000171       0xc2 build/app/spawn.o
+ .debug_line_str
+                0x00000171       0xd9 build/app/dispatcher.o
+ .debug_line_str
+                0x00000171       0xbf build/app/main.o
+
+.debug_info     0x00000000     0x2e21
+ .debug_info    0x00000000       0x24 build/start.o
+ .debug_info    0x00000024       0x25 build/trap.o
+ .debug_info    0x00000049      0x4b5 build/platform/uart16550.o
+ .debug_info    0x000004fe      0x467 build/platform/timer_clint.o
+ .debug_info    0x00000965      0x147 build/kernel/mini_libc.o
+ .debug_info    0x00000aac     0x1302 build/kernel/sched.o
+ .debug_info    0x00001dae      0x43a build/kernel/trap_handler.o
+ .debug_info    0x000021e8      0x357 build/app/task_table.o
+ .debug_info    0x0000253f      0x336 build/app/spawn.o
+ .debug_info    0x00002875      0x347 build/app/dispatcher.o
+ .debug_info    0x00002bbc      0x265 build/app/main.o
+
+.debug_abbrev   0x00000000     0x11d5
+ .debug_abbrev  0x00000000       0x14 build/start.o
+ .debug_abbrev  0x00000014       0x14 build/trap.o
+ .debug_abbrev  0x00000028      0x24e build/platform/uart16550.o
+ .debug_abbrev  0x00000276      0x217 build/platform/timer_clint.o
+ .debug_abbrev  0x0000048d       0xd7 build/kernel/mini_libc.o
+ .debug_abbrev  0x00000564      0x48f build/kernel/sched.o
+ .debug_abbrev  0x000009f3      0x1b0 build/kernel/trap_handler.o
+ .debug_abbrev  0x00000ba3      0x196 build/app/task_table.o
+ .debug_abbrev  0x00000d39      0x191 build/app/spawn.o
+ .debug_abbrev  0x00000eca      0x1c7 build/app/dispatcher.o
+ .debug_abbrev  0x00001091      0x144 build/app/main.o
+
+.debug_aranges  0x00000000      0x240
+ .debug_aranges
+                0x00000000       0x20 build/start.o
+ .debug_aranges
+                0x00000020       0x20 build/trap.o
+ .debug_aranges
+                0x00000040       0x48 build/platform/uart16550.o
+ .debug_aranges
+                0x00000088       0x38 build/platform/timer_clint.o
+ .debug_aranges
+                0x000000c0       0x28 build/kernel/mini_libc.o
+ .debug_aranges
+                0x000000e8       0x88 build/kernel/sched.o
+ .debug_aranges
+                0x00000170       0x20 build/kernel/trap_handler.o
+ .debug_aranges
+                0x00000190       0x40 build/app/task_table.o
+ .debug_aranges
+                0x000001d0       0x20 build/app/spawn.o
+ .debug_aranges
+                0x000001f0       0x28 build/app/dispatcher.o
+ .debug_aranges
+                0x00000218       0x28 build/app/main.o
+
+.debug_str      0x00000000      0x71d
+ .debug_str     0x00000000      0x71d build/start.o
+                                 0x32 (size before relaxing)
+ .debug_str     0x0000071d       0x31 build/trap.o
+ .debug_str     0x0000071d      0x1e9 build/platform/uart16550.o
+ .debug_str     0x0000071d      0x2d4 build/platform/timer_clint.o
+ .debug_str     0x0000071d      0x16d build/kernel/mini_libc.o
+ .debug_str     0x0000071d      0x554 build/kernel/sched.o
+ .debug_str     0x0000071d      0x1f9 build/kernel/trap_handler.o
+ .debug_str     0x0000071d      0x1e5 build/app/task_table.o
+ .debug_str     0x0000071d      0x1ec build/app/spawn.o
+ .debug_str     0x0000071d      0x211 build/app/dispatcher.o
+ .debug_str     0x0000071d      0x208 build/app/main.o
+
+.debug_loclists
+                0x00000000      0xf26
+ .debug_loclists
+                0x00000000      0x19f build/platform/uart16550.o
+ .debug_loclists
+                0x0000019f      0x120 build/platform/timer_clint.o
+ .debug_loclists
+                0x000002bf       0xc7 build/kernel/mini_libc.o
+ .debug_loclists
+                0x00000386      0x8fd build/kernel/sched.o
+ .debug_loclists
+                0x00000c83       0x80 build/kernel/trap_handler.o
+ .debug_loclists
+                0x00000d03       0xb8 build/app/task_table.o
+ .debug_loclists
+                0x00000dbb       0xa3 build/app/spawn.o
+ .debug_loclists
+                0x00000e5e       0xc8 build/app/dispatcher.o
+
+.debug_rnglists
+                0x00000000      0x45f
+ .debug_rnglists
+                0x00000000       0xb5 build/platform/uart16550.o
+ .debug_rnglists
+                0x000000b5       0x73 build/platform/timer_clint.o
+ .debug_rnglists
+                0x00000128       0x19 build/kernel/mini_libc.o
+ .debug_rnglists
+                0x00000141      0x20c build/kernel/sched.o
+ .debug_rnglists
+                0x0000034d       0x3f build/kernel/trap_handler.o
+ .debug_rnglists
+                0x0000038c       0x4e build/app/task_table.o
+ .debug_rnglists
+                0x000003da       0x23 build/app/spawn.o
+ .debug_rnglists
+                0x000003fd       0x49 build/app/dispatcher.o
+ .debug_rnglists
+                0x00000446       0x19 build/app/main.o
+
+.debug_frame    0x00000000      0x404
+ .debug_frame   0x00000000       0x8c build/platform/uart16550.o
+ .debug_frame   0x0000008c       0x50 build/platform/timer_clint.o
+ .debug_frame   0x000000dc       0x30 build/kernel/mini_libc.o
+ .debug_frame   0x0000010c      0x178 build/kernel/sched.o
+ .debug_frame   0x00000284       0x38 build/kernel/trap_handler.o
+ .debug_frame   0x000002bc       0x84 build/app/task_table.o
+ .debug_frame   0x00000340       0x44 build/app/spawn.o
+ .debug_frame   0x00000384       0x44 build/app/dispatcher.o
+ .debug_frame   0x000003c8       0x3c build/app/main.o
