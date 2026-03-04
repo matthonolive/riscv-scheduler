@@ -7,6 +7,7 @@
 
 #define NUM_LANES 16
 #define DEFAULT_DATA_RATE 60
+#define LOG_FILE "sched.log"
 
 typedef struct {
     LaneContext lane;
@@ -15,6 +16,8 @@ typedef struct {
 
 int rr_index = 0;
 int pll_enabled = 1;
+FILE *logfp = NULL;
+int tick = 0;
 
 static const char *state_name(LaneState s)
 {
@@ -55,6 +58,9 @@ static void print_lane_status(int id, const LaneContext *l)
 void taskStepForward(Task *task, int lane_id)
 {
     LaneState prev = task->lane.state;
+    int prev_pt = task->lane.pt;
+    int prev_ia = task->lane.ia;
+    int prev_iz = task->lane.iz;
     task->priority++;
 
     if (task->lane.state == INIT) {
@@ -67,8 +73,51 @@ void taskStepForward(Task *task, int lane_id)
         lane_step_rx(&task->lane);
     }
 
-    /* print on state transitions */
+    /* ── Verbose file log: every step ── */
+    if (logfp) {
+        fprintf(logfp, "[tick %8d] Lane %2d  state=%-4s  pt=%d/%d  prio=%d\n",
+                tick, lane_id, state_name(task->lane.state),
+                task->lane.pt, task->lane.N_samp, task->priority);
+
+        /* CTLE sweep: log when a grid point completes (ia or iz advanced) */
+        if (task->lane.state == CTLE && prev == CTLE) {
+            int old_grid = prev_ia + prev_iz * CTLE_NA;
+            int new_grid = task->lane.ia + task->lane.iz * CTLE_NA;
+            if (new_grid != old_grid) {
+                /* the grid point that just finished is (prev_ia, prev_iz) */
+                fprintf(logfp, "             Lane %2d  CTLE sweep: completed grid [%d/%d]"
+                        "  A=%.4f z=%.3e  MSE=%.6f\n",
+                        lane_id, old_grid + 1, CTLE_NA * CTLE_NZ,
+                        task->lane.A_vec[prev_ia], task->lane.z_vec[prev_iz],
+                        task->lane.J[prev_ia][prev_iz]);
+                fprintf(logfp, "             Lane %2d  CTLE sweep: now testing [%d/%d]"
+                        "  A=%.4f z=%.3e\n",
+                        lane_id, new_grid + 1, CTLE_NA * CTLE_NZ,
+                        task->lane.ctle_A, task->lane.ctle_z);
+            }
+        }
+
+        /* RX progress: log taps every 25% */
+        if (task->lane.state == RX && prev == RX) {
+            int quarter = task->lane.N_samp / 4;
+            if (quarter > 0 && prev_pt / quarter != task->lane.pt / quarter) {
+                int pct = (task->lane.pt * 100) / task->lane.N_samp;
+                fprintf(logfp, "             Lane %2d  RX training %d%%  RX_FFE[main]=%.6f"
+                        "  DFE[0]=%.6f\n",
+                        lane_id, pct,
+                        task->lane.RX_FFE[RX_FFE_PRE], task->lane.DFE[0]);
+                fprintf(logfp, "               RX_FFE = [");
+                for (int k = 0; k < RX_FFE_LEN; k++)
+                    fprintf(logfp, "%s%+.6f", k ? ", " : "", task->lane.RX_FFE[k]);
+                fprintf(logfp, "]\n");
+            }
+        }
+    }
+
+    /* ── State transition: console + file ── */
     if (task->lane.state != prev) {
+
+        /* --- Console (concise) --- */
         printf("[Lane %2d] %s → %s", lane_id,
                state_name(prev), state_name(task->lane.state));
 
@@ -91,6 +140,54 @@ void taskStepForward(Task *task, int lane_id)
         }
         printf("\n");
         fflush(stdout);
+
+        /* --- Log file (verbose) --- */
+        if (logfp) {
+            fprintf(logfp, "========== Lane %2d TRANSITION: %s → %s (tick %d) ==========\n",
+                    lane_id, state_name(prev), state_name(task->lane.state), tick);
+
+            if (prev == INIT) {
+                fprintf(logfp, "  Channel:  %s (%d taps)\n",
+                        task->lane.channel_file, task->lane.L);
+                fprintf(logfp, "  Data rate: %d Gbps  Fs=%.3e Hz\n",
+                        task->lane.dataRateGbps, task->lane.Fs);
+                fprintf(logfp, "  CDR:       sample_instant=%d  lag=%d\n",
+                        task->lane.sample_instant, task->lane.lag);
+                fprintf(logfp, "  TX FFE:    [");
+                for (int k = 0; k < TX_FFE_LEN; k++)
+                    fprintf(logfp, "%s%+.6f", k ? ", " : "", task->lane.TX_FFE[k]);
+                fprintf(logfp, "]\n");
+            }
+
+            if (prev == CTLE) {
+                fprintf(logfp, "  Best CTLE: A=%.6f  z=%.6e  p=%.6e\n",
+                        task->lane.ctle_A, task->lane.ctle_z, task->lane.ctle_p);
+                fprintf(logfp, "  Sweep MSE grid (A rows x z cols):\n");
+                for (int a = 0; a < CTLE_NA; a++) {
+                    fprintf(logfp, "    A=%.4f |", task->lane.A_vec[a]);
+                    for (int z = 0; z < CTLE_NZ; z++) {
+                        if (task->lane.J[a][z] < 1e20)
+                            fprintf(logfp, " %10.6f", task->lane.J[a][z]);
+                        else
+                            fprintf(logfp, "        N/A");
+                    }
+                    fprintf(logfp, "\n");
+                }
+            }
+
+            if (prev == RX) {
+                fprintf(logfp, "  RX FFE taps (%d total):\n", RX_FFE_LEN);
+                for (int k = 0; k < RX_FFE_LEN; k++)
+                    fprintf(logfp, "    RX_FFE[%2d] = %+.8f%s\n", k, task->lane.RX_FFE[k],
+                            k == RX_FFE_PRE ? "  <-- main cursor" : "");
+                fprintf(logfp, "  DFE taps (%d total):\n", N_DFE);
+                for (int k = 0; k < N_DFE; k++)
+                    fprintf(logfp, "    DFE[%d]    = %+.8f\n", k, task->lane.DFE[k]);
+            }
+
+            fprintf(logfp, "==========================================================\n");
+            fflush(logfp);
+        }
     }
 }
 
@@ -101,6 +198,10 @@ int main(int argc, char *argv[]) {
     }
 
     setvbuf(stdout, NULL, _IOLBF, 0);
+
+    logfp = fopen(LOG_FILE, "w");
+    if (!logfp)
+        fprintf(stderr, "Warning: could not open %s for writing\n", LOG_FILE);
 
     const char *channel_file = argv[1];
     int clock = 0;
@@ -115,16 +216,33 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Scheduler started with channel '%s'.\n", channel_file);
+    printf("Logs → %s\n", LOG_FILE);
     printf("Commands:\n");
     printf("  s [lane]  - show status (all lanes, or one lane)\n");
     printf("  d <lane> <rate>\n");
     printf("  r <lane>\n");
     printf("  p\n");
 
+    if (logfp) {
+        fprintf(logfp, "=== Scheduler started ===\n");
+        fprintf(logfp, "Channel file: %s\n", channel_file);
+        fprintf(logfp, "Lanes: %d   Data rate: %d Gbps\n", NUM_LANES, DEFAULT_DATA_RATE);
+        fprintf(logfp, "OSF=%d  N_BIT=%d  ADC_BITS=%d  NUM_LEVELS=%d\n",
+                OSF, N_BIT, ADC_BITS, NUM_LEVELS);
+        fprintf(logfp, "TX_FFE: pre=%d post=%d len=%d\n", TX_FFE_PRE, TX_FFE_POST, TX_FFE_LEN);
+        fprintf(logfp, "RX_FFE: pre=%d post=%d len=%d\n", RX_FFE_PRE, RX_FFE_POST, RX_FFE_LEN);
+        fprintf(logfp, "DFE taps: %d\n", N_DFE);
+        fprintf(logfp, "CTLE sweep: %d A steps x %d z steps, window=%d symbols\n",
+                CTLE_NA, CTLE_NZ, CTLE_WINDOW);
+        fprintf(logfp, "Step size: %d samples/step\n\n", STEP_SIZE);
+        fflush(logfp);
+    }
+
     int stdin_open = 1;
 
     while (1) {
         clock++;
+        tick++;
 
         /* -------- INTERRUPT HANDLING -------- */
         if (stdin_open) {
@@ -148,6 +266,7 @@ int main(int argc, char *argv[]) {
                         for (int i = 0; i < NUM_LANES; i++)
                             print_lane_status(i, &taskList[i].lane);
                     }
+                    if (logfp) fprintf(logfp, "[tick %8d] CMD: status query\n", tick);
                 }
                 else if (buf[0] == 'd') {
                     int lane, rate;
@@ -157,6 +276,8 @@ int main(int argc, char *argv[]) {
                         lane_soft_reset(&taskList[lane].lane);
                         taskList[lane].priority = 0;
                         printf("Lane %d rate changed to %d Gbps\n", lane, rate);
+                        if (logfp) fprintf(logfp, "[tick %8d] CMD: lane %d rate → %d Gbps (soft reset)\n",
+                                           tick, lane, rate);
                     }
                 }
                 else if (buf[0] == 'r') {
@@ -166,11 +287,14 @@ int main(int argc, char *argv[]) {
                         lane_soft_reset(&taskList[lane].lane);
                         taskList[lane].priority = 0;
                         printf("Lane %d soft reset\n", lane);
+                        if (logfp) fprintf(logfp, "[tick %8d] CMD: lane %d soft reset\n", tick, lane);
                     }
                 }
                 else if (buf[0] == 'p') {
                     pll_enabled = !pll_enabled;
                     printf("PLL %s\n", pll_enabled ? "ON" : "OFF");
+                    if (logfp) fprintf(logfp, "[tick %8d] CMD: PLL %s\n", tick,
+                                       pll_enabled ? "ON" : "OFF");
                 }
             }
         }
