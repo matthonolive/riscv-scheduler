@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "serdes_sim.h"
 
@@ -84,7 +85,6 @@ void taskStepForward(Task *task, int lane_id)
             int old_grid = prev_ia + prev_iz * CTLE_NA;
             int new_grid = task->lane.ia + task->lane.iz * CTLE_NA;
             if (new_grid != old_grid) {
-                /* the grid point that just finished is (prev_ia, prev_iz) */
                 fprintf(logfp, "             Lane %2d  CTLE sweep: completed grid [%d/%d]"
                         "  A=%.4f z=%.3e  MSE=%.6f\n",
                         lane_id, old_grid + 1, CTLE_NA * CTLE_NZ,
@@ -193,40 +193,70 @@ void taskStepForward(Task *task, int lane_id)
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s <channel_taps.txt>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <channel_taps.txt> [-r]\n", argv[0]);
+        fprintf(stderr, "  -r   assign random initial priorities to each lane\n");
         return 1;
     }
 
+    /* parse args */
+    const char *channel_file = NULL;
+    int random_prio = 0;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-r") == 0)
+            random_prio = 1;
+        else
+            channel_file = argv[i];
+    }
+
+    if (!channel_file) {
+        fprintf(stderr, "Error: no channel file specified.\n");
+        return 1;
+    }
+
+    srand((unsigned)time(NULL));
     setvbuf(stdout, NULL, _IOLBF, 0);
 
     logfp = fopen(LOG_FILE, "w");
     if (!logfp)
         fprintf(stderr, "Warning: could not open %s for writing\n", LOG_FILE);
 
-    const char *channel_file = argv[1];
     int clock = 0;
     fd_set readfds;
 
     Task taskList[NUM_LANES];
 
-    // Initialize all lanes with the same channel file
+    /* Initialize all lanes */
     for (int i = 0; i < NUM_LANES; i++) {
         lane_init(&taskList[i].lane, DEFAULT_DATA_RATE, channel_file);
-        taskList[i].priority = 1;
+        taskList[i].priority = random_prio ? (rand() % NUM_LANES) : 1;
     }
 
     printf("Scheduler started with channel '%s'.\n", channel_file);
+    printf("Priority mode: %s\n", random_prio ? "RANDOM" : "EQUAL");
     printf("Logs → %s\n", LOG_FILE);
+
+    /* print initial priorities */
+    printf("Initial priorities:");
+    for (int i = 0; i < NUM_LANES; i++)
+        printf(" [%d]=%d", i, taskList[i].priority);
+    printf("\n");
+
     printf("Commands:\n");
-    printf("  s [lane]  - show status (all lanes, or one lane)\n");
-    printf("  d <lane> <rate>\n");
-    printf("  r <lane>\n");
-    printf("  p\n");
+    printf("  s [lane]          - show status (all lanes, or one lane)\n");
+    printf("  d <lane> <rate>   - change data rate for a lane\n");
+    printf("  r <lane>          - soft reset a lane\n");
+    printf("  p                 - turn PLL on/off\n");
 
     if (logfp) {
         fprintf(logfp, "=== Scheduler started ===\n");
         fprintf(logfp, "Channel file: %s\n", channel_file);
+        fprintf(logfp, "Priority mode: %s\n", random_prio ? "RANDOM" : "EQUAL");
         fprintf(logfp, "Lanes: %d   Data rate: %d Gbps\n", NUM_LANES, DEFAULT_DATA_RATE);
+        fprintf(logfp, "Initial priorities:");
+        for (int i = 0; i < NUM_LANES; i++)
+            fprintf(logfp, " [%d]=%d", i, taskList[i].priority);
+        fprintf(logfp, "\n");
         fprintf(logfp, "OSF=%d  N_BIT=%d  ADC_BITS=%d  NUM_LEVELS=%d\n",
                 OSF, N_BIT, ADC_BITS, NUM_LEVELS);
         fprintf(logfp, "TX_FFE: pre=%d post=%d len=%d\n", TX_FFE_PRE, TX_FFE_POST, TX_FFE_LEN);
@@ -330,8 +360,13 @@ int main(int argc, char *argv[]) {
             taskStepForward(&taskList[chosen], chosen);
         }
 
+        if (chosen < 0 && pll_enabled) {
+            goto exit;
+        }
+
         usleep(10);    /* simulate firmware time slice */
     }
 
+exit:
     return 0;
 }
