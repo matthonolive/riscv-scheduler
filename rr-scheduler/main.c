@@ -3,18 +3,18 @@
 
 volatile uint32_t *UART0 = (uint32_t*)0x10000000;
 
-extern void trap_vector();
-extern void timer_init();
+// extern void trap_vector();
+// extern void timer_init();
 
-static inline void enable_interrupts() {
-    asm volatile("csrw mtvec, %0" :: "r"(trap_vector));
+// static inline void enable_interrupts() {
+//     asm volatile("csrw mtvec, %0" :: "r"(trap_vector));
     
-    // Enable machine timer interrupt
-    asm volatile("csrs mie, %0" :: "r"(1 << 7));  // MTIE
+//     // Enable machine timer interrupt
+//     asm volatile("csrs mie, %0" :: "r"(1 << 7));  // MTIE
     
-    // Enable global interrupt
-    asm volatile("csrs mstatus, %0" :: "r"(1 << 3)); // MIE
-}
+//     // Enable global interrupt
+//     asm volatile("csrs mstatus, %0" :: "r"(1 << 3)); // MIE
+// }
 
 void print(const char *s) {
     while (*s) {
