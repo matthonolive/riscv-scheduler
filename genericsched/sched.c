@@ -25,7 +25,7 @@ FILE *logfp = NULL;
 int tick = 0;
 
 typedef struct {
-    void *task_buffer; // Initialized in main as an arrayList of Task structs
+    Task *task_buffer; // Initialized in main as an arrayList of Task structs
     int task_buffer_size;
     int task_buffer_capacity; 
 } Task_List;
@@ -71,8 +71,14 @@ int main(int argc, char *argv[]) {
 
     /* Initialize all lanes */
     for (int i = 0; i < NUM_LANES; i++) {
-        lane_init(&taskList.task_buffer[i].lane, DEFAULT_DATA_RATE, channel_file);
-        taskList.task_buffer[i].priority = random_prio ? (rand() % NUM_LANES) : 1;
+        Task *cur_task = taskList.task_buffer + i * sizeof(Task);
+        taskList.task_buffer_size++;
+        generic_lane_init(&cur_task->task_data, &(LaneInitArgs){.dataRateGbps=DEFAULT_DATA_RATE, .channel_file=channel_file});
+        cur_task->task_run = generic_lane_step;
+        cur_task->priority = random_prio ? (rand() % NUM_LANES) : 1;
+        cur_task->is_active = 1;
+        //lane_init(&taskList.task_buffer[i].lane, DEFAULT_DATA_RATE, channel_file);
+        //taskList.task_buffer[i].priority = random_prio ? (rand() % NUM_LANES) : 1;
     }
 
     printf("Scheduler started with channel '%s'.\n", channel_file);
@@ -82,7 +88,7 @@ int main(int argc, char *argv[]) {
     /* print initial priorities */
     printf("Initial priorities:");
     for (int i = 0; i < NUM_LANES; i++)
-        printf(" [%d]=%d", i, taskList[i].priority);
+        printf(" [%d]=%d", i, taskList.task_buffer[i].priority);
     printf("\n");
 
     printf("Commands:\n");
@@ -98,7 +104,7 @@ int main(int argc, char *argv[]) {
         fprintf(logfp, "Lanes: %d   Data rate: %d Gbps\n", NUM_LANES, DEFAULT_DATA_RATE);
         fprintf(logfp, "Initial priorities:");
         for (int i = 0; i < NUM_LANES; i++)
-            fprintf(logfp, " [%d]=%d", i, taskList[i].priority);
+            fprintf(logfp, " [%d]=%d", i, taskList.task_buffer[i].priority);
         fprintf(logfp, "\n");
         fprintf(logfp, "OSF=%d  N_BIT=%d  ADC_BITS=%d  NUM_LEVELS=%d\n",
                 OSF, N_BIT, ADC_BITS, NUM_LEVELS);
@@ -119,12 +125,12 @@ int main(int argc, char *argv[]) {
 
         /* -------- INTERRUPT HANDLING -------- */
         if (stdin_open) {
-            FD_ZERO(&readfds);
+           FD_ZERO(&readfds);
             FD_SET(STDIN_FILENO, &readfds);
             struct timeval tv = {0, 0};
 
             int ret = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv);
-
+ 
             if (ret > 0) {
                 char buf[64];
                 if (!fgets(buf, sizeof(buf), stdin)) {
@@ -180,9 +186,9 @@ int main(int argc, char *argv[]) {
         /* Find best priority */
         for (int i = 0; i < NUM_LANES; i++) {
             if (taskList[i].lane.state != DONE &&
-                taskList[i].priority < best)
+                taskList.task_buffer[i].priority < best)
             {
-                best = taskList[i].priority;
+                best = taskList.task_buffer[i].priority;
             }
         }
 
@@ -191,7 +197,7 @@ int main(int argc, char *argv[]) {
             int i = (rr_index + k) % NUM_LANES;
 
             if (taskList[i].lane.state != DONE &&
-                taskList[i].priority == best)
+                taskList.task_buffer[i].priority == best)
             {
                 chosen = i;
                 break;

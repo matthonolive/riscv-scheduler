@@ -594,6 +594,33 @@ void generic_lane_init(void *ctx, void *args)
     lane_init(lane_ctx, init_args->dataRateGbps, init_args->channel_file);
 }
 
+void generic_lane_step(void *ctx, void *args)
+{
+    LaneContext *lane_ctx = (LaneContext *)ctx;
+    LaneStepArgs *step_args = (LaneStepArgs *)args;
+
+    switch (step_args->flags) {
+        case SOFT_RESET:
+            lane_soft_reset(lane_ctx);
+            break;
+        case DATA_RATE_CHANGE:
+            lane_ctx->dataRateGbps = step_args->dataRateGbps;
+            break;
+        default:
+            if (lane_ctx->state == INIT) {
+                lane_step_init(lane_ctx);
+            }
+            else if (lane_ctx->state == CTLE) {
+                lane_step_ctle(lane_ctx);
+            }
+            else if (lane_ctx->state == RX) {
+                lane_step_rx(lane_ctx);
+            }
+    }
+
+   
+}
+
 void updateLaneTick()
 {
     lane_tick++;

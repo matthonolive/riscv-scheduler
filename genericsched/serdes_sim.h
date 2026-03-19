@@ -78,6 +78,7 @@ typedef struct {
     LaneState state;
     int       dataRateGbps;         /* symbol rate in Gbps               */
     double    Fs;                   /* sample rate = OSF * dataRate       */
+    int       id;                   /* lane ID (for logging/debugging)   */
 
     /* ── Channel ────────────────────────────────────────────────────── */
     double h_fir[MAX_CHANNEL_TAPS]; /* FIR taps loaded from file          */
@@ -172,8 +173,13 @@ const char *state_name(LaneState s);
  * ══════════════════════════════════════════════════════════════════════= 
  */
 
+ // ctx is a pointer to a LaneContext struct
+
+ // args is a pointer to a LaneInitArgs struct
  void generic_lane_init(void *ctx, void* args);
+ // 
  void generic_lane_step(void *ctx, void* args);
+ void generic_print_lane_status(void *ctx, int lane_id);
 
  /* ══════════════════════════════════════════════════════════════════════
  *  Generic arg structs
@@ -183,10 +189,19 @@ typedef struct {
     const char *channel_file;
 } LaneInitArgs;
 
+typedef enum {
+    NO_INTERRUPT = 0,
+    SOFT_RESET   = 1,
+    DATA_RATE_CHANGE = 2,
+    PLL_TOGGLE = 3
+} InterruptType;
+
 typedef struct {
+    InterruptType flags; // 
     int dataRateGbps; // Only used if flags=2 (data rate change interrupt)
-    char flags; // If flags = 0, then run as usual. Otherwise, flags represent the interrupt type (1 = soft reset, 2 = data rate change, etc.)
 } LaneStepArgs;
+
+
 
 // Debugging
 void updateLaneTick();
