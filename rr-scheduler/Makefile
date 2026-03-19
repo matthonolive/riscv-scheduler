@@ -1,9 +1,9 @@
 CC = riscv64-unknown-elf-gcc
-CFLAGS = -march=rv32im -mabi=ilp32 -nostdlib -ffreestanding
+CFLAGS = -march=rv32imafd -mabi=ilp32d -nostdlib -ffreestanding -O2
 
 all: kernel.elf
 
-kernel.elf: start.S main.c scheduler.c context.S
+kernel.elf: start.S main.c scheduler.c context.S timer.S
 	$(CC) $(CFLAGS) -T linker.ld $^ -o $@
 
 run:
