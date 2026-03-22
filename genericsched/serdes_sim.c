@@ -550,8 +550,9 @@ void lane_destroy(LaneContext *ctx)
  *  Debug: print lane status to console and log file
  * ═══════════════════════════════════════════════════════════════════════ */
 
-void print_lane_status(int id, const LaneContext *l)
+void print_lane_status(const LaneContext *l)
 {
+    int id = l->id;
     printf("  Lane %2d | %s | %d Gbps", id, state_name(l->state), l->dataRateGbps);
 
     if (l->state == CTLE || l->state == RX || l->state == DONE)
@@ -586,18 +587,25 @@ const char *state_name(LaneState s)
     return "?";
 }
 
-void generic_lane_init(void *ctx, void *args)
+void generic_lane_init(void **p_ctx, void *args)
 {
-    LaneContext *lane_ctx = (LaneContext *)ctx;
+    *p_ctx = malloc(sizeof(LaneContext));
+    LaneContext *lane_ctx = (LaneContext *)*p_ctx;
     LaneInitArgs *init_args = (LaneInitArgs *)args;
 
     lane_init(lane_ctx, init_args->dataRateGbps, init_args->channel_file);
 }
 
-void generic_lane_step(void *ctx, void *args)
+// Returns 0 if the lane is still active; else, returns 1 if the lane is DONE
+int generic_lane_step(void *ctx, void *args)
 {
     LaneContext *lane_ctx = (LaneContext *)ctx;
     LaneStepArgs *step_args = (LaneStepArgs *)args;
+
+    LaneState prev = lane_ctx->state;
+    int prev_pt = lane_ctx->pt;
+    int prev_ia = lane_ctx->ia;
+    int prev_iz = lane_ctx->iz;
 
     switch (step_args->flags) {
         case SOFT_RESET:
@@ -605,6 +613,9 @@ void generic_lane_step(void *ctx, void *args)
             break;
         case DATA_RATE_CHANGE:
             lane_ctx->dataRateGbps = step_args->dataRateGbps;
+            break;
+        case PRINT_STATUS:
+            print_lane_status(lane_ctx);
             break;
         default:
             if (lane_ctx->state == INIT) {
@@ -618,96 +629,68 @@ void generic_lane_step(void *ctx, void *args)
             }
     }
 
-   
-}
-
-void updateLaneTick()
-{
-    lane_tick++;
-}
-
-void taskStepForward(void *ctx, int lane_id)
-{
-
-    LaneContext *lane_ctx_p = (LaneContext *)ctx;
-
-    LaneState prev = lane_ctx_p->state;
-    int prev_pt = lane_ctx_p->pt;
-    int prev_ia = lane_ctx_p->ia;
-    int prev_iz = lane_ctx_p->iz;
-
-    if (lane_ctx_p->state == INIT) {
-        lane_step_init(lane_ctx_p);
-    }
-    else if (lane_ctx_p->state == CTLE) {
-        lane_step_ctle(lane_ctx_p);
-    }
-    else if (lane_ctx_p->state == RX) {
-        lane_step_rx(lane_ctx_p);
-    }
-
-    /* ── Verbose file log: every step ── */
+        /* ── Verbose file log: every step ── */
     if (lane_logfp) {
         fprintf(lane_logfp, "[tick %8d] Lane %2d  state=%-4s  pt=%d/%d\n",
-                lane_tick, lane_id, state_name(lane_ctx_p->state),
-                lane_ctx_p->pt, lane_ctx_p->N_samp);
+                lane_tick, lane_ctx->id, state_name(lane_ctx->state),
+                lane_ctx->pt, lane_ctx->N_samp);
 
         /* CTLE sweep: log when a grid point completes (ia or iz advanced) */
-        if (lane_ctx_p->state == CTLE && prev == CTLE) {
+        if (lane_ctx->state == CTLE && prev == CTLE) {
             int old_grid = prev_ia + prev_iz * CTLE_NA;
-            int new_grid = lane_ctx_p->ia + lane_ctx_p->iz * CTLE_NA;
+            int new_grid = lane_ctx->ia + lane_ctx->iz * CTLE_NA;
             if (new_grid != old_grid) {
                 fprintf(lane_logfp, "             Lane %2d  CTLE sweep: completed grid [%d/%d]"
                         "  A=%.4f z=%.3e  MSE=%.6f\n",
-                        lane_id, old_grid + 1, CTLE_NA * CTLE_NZ,
-                        lane_ctx_p->A_vec[prev_ia], lane_ctx_p->z_vec[prev_iz],
-                        lane_ctx_p->J[prev_ia][prev_iz]);
+                        lane_ctx->id, old_grid + 1, CTLE_NA * CTLE_NZ,
+                        lane_ctx->A_vec[prev_ia], lane_ctx->z_vec[prev_iz],
+                        lane_ctx->J[prev_ia][prev_iz]);
                 fprintf(lane_logfp, "             Lane %2d  CTLE sweep: now testing [%d/%d]"
                         "  A=%.4f z=%.3e\n",
-                        lane_id, new_grid + 1, CTLE_NA * CTLE_NZ,
-                        lane_ctx_p->ctle_A, lane_ctx_p->ctle_z);
+                        lane_ctx->id, new_grid + 1, CTLE_NA * CTLE_NZ,
+                        lane_ctx->ctle_A, lane_ctx->ctle_z);
             }
         }
 
         /* RX progress: log taps every 25% */
-        if (lane_ctx_p->state == RX && prev == RX) {
-            int quarter = lane_ctx_p->N_samp / 4;
-            if (quarter > 0 && prev_pt / quarter != lane_ctx_p->pt / quarter) {
-                int pct = (lane_ctx_p->pt * 100) / lane_ctx_p->N_samp;
+        if (lane_ctx->state == RX && prev == RX) {
+            int quarter = lane_ctx->N_samp / 4;
+            if (quarter > 0 && prev_pt / quarter != lane_ctx->pt / quarter) {
+                int pct = (lane_ctx->pt * 100) / lane_ctx->N_samp;
                 fprintf(lane_logfp, "             Lane %2d  RX training %d%%  RX_FFE[main]=%.6f"
                         "  DFE[0]=%.6f\n",
-                        lane_id, pct,
-                        lane_ctx_p->RX_FFE[RX_FFE_PRE], lane_ctx_p->DFE[0]);
+                        lane_ctx->id, pct,
+                        lane_ctx->RX_FFE[RX_FFE_PRE], lane_ctx->DFE[0]);
                 fprintf(lane_logfp, "               RX_FFE = [");
                 for (int k = 0; k < RX_FFE_LEN; k++)
-                    fprintf(lane_logfp, "%s%+.6f", k ? ", " : "", lane_ctx_p->RX_FFE[k]);
+                    fprintf(lane_logfp, "%s%+.6f", k ? ", " : "", lane_ctx->RX_FFE[k]);
                 fprintf(lane_logfp, "]\n");
             }
         }
     }
 
     /* ── State transition: console + file ── */
-    if (lane_ctx_p->state != prev) {
+    if (lane_ctx->state != prev) {
 
         /* --- Console (concise) --- */
-        printf("[Lane %2d] %s → %s", lane_id,
-               state_name(prev), state_name(lane_ctx_p->state));
+        printf("[Lane %2d] %s → %s", lane_ctx->id,
+               state_name(prev), state_name(lane_ctx->state));
 
         if (prev == INIT)
             printf("  (loaded %d taps, CDR instant=%d lag=%d)",
-                   lane_ctx_p->L, lane_ctx_p->sample_instant, lane_ctx_p->lag);
+                   lane_ctx->L, lane_ctx->sample_instant, lane_ctx->lag);
 
         if (prev == CTLE)
             printf("  (CTLE A=%.4f z=%.3e)",
-                   lane_ctx_p->ctle_A, lane_ctx_p->ctle_z);
+                   lane_ctx->ctle_A, lane_ctx->ctle_z);
 
         if (prev == RX) {
             printf("\n  RX_FFE = [");
             for (int k = 0; k < RX_FFE_LEN; k++)
-                printf("%s%+.6f", k ? ", " : "", lane_ctx_p->RX_FFE[k]);
+                printf("%s%+.6f", k ? ", " : "", lane_ctx->RX_FFE[k]);
             printf("]\n  DFE    = [");
             for (int k = 0; k < N_DFE; k++)
-                printf("%s%+.6f", k ? ", " : "", lane_ctx_p->DFE[k]);
+                printf("%s%+.6f", k ? ", " : "", lane_ctx->DFE[k]);
             printf("]");
         }
         printf("\n");
@@ -716,30 +699,30 @@ void taskStepForward(void *ctx, int lane_id)
         /* --- Log file (verbose) --- */
         if (lane_logfp) {
             fprintf(lane_logfp, "========== Lane %2d TRANSITION: %s → %s (tick %d) ==========\n",
-                    lane_id, state_name(prev), state_name(lane_ctx_p->state), lane_tick);
+                    lane_ctx->id, state_name(prev), state_name(lane_ctx->state), lane_tick);
 
             if (prev == INIT) {
                 fprintf(lane_logfp, "  Channel:  %s (%d taps)\n",
-                        lane_ctx_p->channel_file, lane_ctx_p->L);
+                        lane_ctx->channel_file, lane_ctx->L);
                 fprintf(lane_logfp, "  Data rate: %d Gbps  Fs=%.3e Hz\n",
-                        lane_ctx_p->dataRateGbps, lane_ctx_p->Fs);
+                        lane_ctx->dataRateGbps, lane_ctx->Fs);
                 fprintf(lane_logfp, "  CDR:       sample_instant=%d  lag=%d\n",
-                        lane_ctx_p->sample_instant, lane_ctx_p->lag);
+                        lane_ctx->sample_instant, lane_ctx->lag);
                 fprintf(lane_logfp, "  TX FFE:    [");
                 for (int k = 0; k < TX_FFE_LEN; k++)
-                    fprintf(lane_logfp, "%s%+.6f", k ? ", " : "", lane_ctx_p->TX_FFE[k]);
+                    fprintf(lane_logfp, "%s%+.6f", k ? ", " : "", lane_ctx->TX_FFE[k]);
                 fprintf(lane_logfp, "]\n");
             }
 
             if (prev == CTLE) {
                 fprintf(lane_logfp, "  Best CTLE: A=%.6f  z=%.6e  p=%.6e\n",
-                        lane_ctx_p->ctle_A, lane_ctx_p->ctle_z, lane_ctx_p->ctle_p);
+                        lane_ctx->ctle_A, lane_ctx->ctle_z, lane_ctx->ctle_p);
                 fprintf(lane_logfp, "  Sweep MSE grid (A rows x z cols):\n");
                 for (int a = 0; a < CTLE_NA; a++) {
-                    fprintf(lane_logfp, "    A=%.4f |", lane_ctx_p->A_vec[a]);
+                    fprintf(lane_logfp, "    A=%.4f |", lane_ctx->A_vec[a]);
                     for (int z = 0; z < CTLE_NZ; z++) {
-                        if (lane_ctx_p->J[a][z] < 1e20)
-                            fprintf(lane_logfp, " %10.6f", lane_ctx_p->J[a][z]);
+                        if (lane_ctx->J[a][z] < 1e20)
+                            fprintf(lane_logfp, " %10.6f", lane_ctx->J[a][z]);
                         else
                             fprintf(lane_logfp, "        N/A");
                     }
@@ -750,16 +733,27 @@ void taskStepForward(void *ctx, int lane_id)
             if (prev == RX) {
                 fprintf(lane_logfp, "  RX FFE taps (%d total):\n", RX_FFE_LEN);
                 for (int k = 0; k < RX_FFE_LEN; k++)
-                    fprintf(lane_logfp, "    RX_FFE[%2d] = %+.8f%s\n", k, lane_ctx_p->RX_FFE[k],
+                    fprintf(lane_logfp, "    RX_FFE[%2d] = %+.8f%s\n", k, lane_ctx->RX_FFE[k],
                             k == RX_FFE_PRE ? "  <-- main cursor" : "");
                 fprintf(lane_logfp, "  DFE taps (%d total):\n", N_DFE);
                 for (int k = 0; k < N_DFE; k++)
-                    fprintf(lane_logfp, "    DFE[%d]    = %+.8f\n", k, lane_ctx_p->DFE[k]);
+                    fprintf(lane_logfp, "    DFE[%d]    = %+.8f\n", k, lane_ctx->DFE[k]);
             }
 
             fprintf(lane_logfp, "==========================================================\n");
             fflush(lane_logfp);
         }
     }
+    return (lane_ctx->state == DONE) ? 1 : 0;
+}
+
+void updateLaneTick()
+{
+    lane_tick++;
+}
+
+void setLogFile(FILE *fp)
+{
+    lane_logfp = fp;
 }
 

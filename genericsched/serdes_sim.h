@@ -165,7 +165,7 @@ void lane_step_ctle    (LaneContext *ctx);
 void lane_step_rx      (LaneContext *ctx);
 void lane_soft_reset   (LaneContext *ctx);
 void lane_destroy      (LaneContext *ctx);
-void print_lane_status(int lane_id, const LaneContext *ctx);
+void print_lane_status(const LaneContext *ctx);
 const char *state_name(LaneState s);
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -176,9 +176,9 @@ const char *state_name(LaneState s);
  // ctx is a pointer to a LaneContext struct
 
  // args is a pointer to a LaneInitArgs struct
- void generic_lane_init(void *ctx, void* args);
+ void generic_lane_init(void **p_ctx, void* args);
  // 
- void generic_lane_step(void *ctx, void* args);
+ int generic_lane_step(void *ctx, void* args);
  void generic_print_lane_status(void *ctx, int lane_id);
 
  /* ══════════════════════════════════════════════════════════════════════
@@ -193,7 +193,8 @@ typedef enum {
     NO_INTERRUPT = 0,
     SOFT_RESET   = 1,
     DATA_RATE_CHANGE = 2,
-    PLL_TOGGLE = 3
+    PLL_TOGGLE = 3,
+    PRINT_STATUS = 4
 } InterruptType;
 
 typedef struct {
